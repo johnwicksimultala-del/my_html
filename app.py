@@ -84,6 +84,7 @@ def financial_overview():
         "Mutual Funds": total_mutual,
         "Stock Holdings": total_stocks,
         "Provision Fund": total_pf,
+        "Udhari":total_udhari 
     }
     asset_df = pd.DataFrame({
         "Asset Type": list(asset_data.keys()),
