@@ -60,7 +60,7 @@ def financial_overview():
     total_stocks = st.session_state.stocks_df["Total Value"].sum() if not st.session_state.stocks_df.empty else 0
     total_udhari = st.session_state.udhari_df["Amount Owed"].sum() if not st.session_state.udhari_df.empty else 0
 
-    total_wealth = total_bank + total_mutual + total_stocks - total_udhari
+    total_wealth = total_bank + total_mutual + total_stocks + total_udhari
 
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Bank Accounts", f"₹{total_bank:,.2f}")
