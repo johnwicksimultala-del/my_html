@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -11,6 +10,7 @@ SHEET_BANK = "BankAccounts"
 SHEET_MUTUAL = "MutualFunds"
 SHEET_STOCKS = "StockHoldings"
 SHEET_UDHARI = "Udhari"
+SHEET_PF = "ProvisionFund"  # New sheet name for Provision Fund
 
 # Initialize session state for dataframes
 if "bank_df" not in st.session_state:
@@ -21,6 +21,8 @@ if "stocks_df" not in st.session_state:
     st.session_state.stocks_df = pd.DataFrame(columns=["Stock Symbol", "Shares", "Price", "Total Value"])
 if "udhari_df" not in st.session_state:
     st.session_state.udhari_df = pd.DataFrame(columns=["Person", "Amount Owed"])
+if "pf_df" not in st.session_state:
+    st.session_state.pf_df = pd.DataFrame(columns=["PF Account Name", "Balance"])
 
 def load_data():
     try:
@@ -29,6 +31,7 @@ def load_data():
         st.session_state.mutual_df = pd.read_excel(xls, SHEET_MUTUAL)
         st.session_state.stocks_df = pd.read_excel(xls, SHEET_STOCKS)
         st.session_state.udhari_df = pd.read_excel(xls, SHEET_UDHARI)
+        st.session_state.pf_df = pd.read_excel(xls, SHEET_PF)
     except FileNotFoundError:
         # No file yet, keep empty dataframes
         pass
@@ -42,6 +45,7 @@ def save_data():
             st.session_state.mutual_df.to_excel(writer, sheet_name=SHEET_MUTUAL, index=False)
             st.session_state.stocks_df.to_excel(writer, sheet_name=SHEET_STOCKS, index=False)
             st.session_state.udhari_df.to_excel(writer, sheet_name=SHEET_UDHARI, index=False)
+            st.session_state.pf_df.to_excel(writer, sheet_name=SHEET_PF, index=False)
     except Exception as e:
         st.error(f"Error saving data: {e}")
 
@@ -59,14 +63,16 @@ def financial_overview():
     total_mutual = st.session_state.mutual_df["Total Value"].sum() if not st.session_state.mutual_df.empty else 0
     total_stocks = st.session_state.stocks_df["Total Value"].sum() if not st.session_state.stocks_df.empty else 0
     total_udhari = st.session_state.udhari_df["Amount Owed"].sum() if not st.session_state.udhari_df.empty else 0
+    total_pf = st.session_state.pf_df["Balance"].sum() if not st.session_state.pf_df.empty else 0
 
-    total_wealth = total_bank + total_mutual + total_stocks + total_udhari
+    total_wealth = total_bank + total_mutual + total_stocks + total_udhari + total_pf
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Bank Accounts", f"₹{total_bank:,.2f}")
     col2.metric("Mutual Funds", f"₹{total_mutual:,.2f}")
     col3.metric("Stock Holdings", f"₹{total_stocks:,.2f}")
     col4.metric("Total Udhari", f"₹{total_udhari:,.2f}")
+    col5.metric("Provision Fund", f"₹{total_pf:,.2f}")
 
     st.markdown("---")
     st.subheader("Wealth Summary")
@@ -77,6 +83,7 @@ def financial_overview():
         "Bank Accounts": total_bank,
         "Mutual Funds": total_mutual,
         "Stock Holdings": total_stocks,
+        "Provision Fund": total_pf,
     }
     asset_df = pd.DataFrame({
         "Asset Type": list(asset_data.keys()),
@@ -318,13 +325,66 @@ def manage_udhari():
                     save_data()
                     st.success("Udhari record deleted.")
 
+def manage_provision_fund():
+    st.subheader("Provision Fund")
+    df = st.session_state.pf_df
+
+    if df.empty:
+        st.info("No Provision Fund records yet.")
+    else:
+        st.dataframe(df.style.format({"Balance": "₹{:,.2f}"}))
+
+    with st.expander("Add New Provision Fund Record"):
+        with st.form("add_pf_form", clear_on_submit=True):
+            pf_account_name = st.text_input("PF Account Name", max_chars=50)
+            pf_balance = st.number_input("Balance", min_value=0.0, format="%.2f")
+            submitted = st.form_submit_button("Add Provision Fund")
+            if submitted:
+                if not pf_account_name.strip():
+                    st.error("PF Account Name cannot be empty.")
+                elif not validate_positive_number(pf_balance, "Balance"):
+                    pass
+                else:
+                    new_row = {"PF Account Name": pf_account_name.strip(), "Balance": pf_balance}
+                    st.session_state.pf_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                    save_data()
+                    st.success(f"Provision Fund '{pf_account_name}' added.")
+
+    if not df.empty:
+        st.markdown("### Edit / Delete Provision Fund Records")
+        selected_index = st.selectbox("Select Provision Fund to edit/delete", df.index, format_func=lambda i: df.at[i, "PF Account Name"])
+        if selected_index is not None:
+            selected_pf = df.loc[selected_index]
+            with st.form("edit_pf_form"):
+                new_pf_name = st.text_input("PF Account Name", value=selected_pf["PF Account Name"], max_chars=50)
+                new_pf_balance = st.number_input("Balance", min_value=0.0, value=float(selected_pf["Balance"]), format="%.2f")
+                col1, col2 = st.columns(2)
+                with col1:
+                    save_btn = st.form_submit_button("Save Changes")
+                with col2:
+                    delete_btn = st.form_submit_button("Delete Provision Fund")
+                if save_btn:
+                    if not new_pf_name.strip():
+                        st.error("PF Account Name cannot be empty.")
+                    elif not validate_positive_number(new_pf_balance, "Balance"):
+                        pass
+                    else:
+                        st.session_state.pf_df.at[selected_index, "PF Account Name"] = new_pf_name.strip()
+                        st.session_state.pf_df.at[selected_index, "Balance"] = new_pf_balance
+                        save_data()
+                        st.success("Provision Fund record updated.")
+                if delete_btn:
+                    st.session_state.pf_df = df.drop(selected_index).reset_index(drop=True)
+                    save_data()
+                    st.success("Provision Fund record deleted.")
+
 def main():
     st.set_page_config(page_title="Personal Finance Dashboard", layout="wide", initial_sidebar_state="expanded")
     st.title("📊 Personal Finance Dashboard")
 
     load_data()
 
-    tabs = st.tabs(["Overview", "Bank Accounts", "Mutual Funds", "Stock Holdings", "Udhari Tracker"])
+    tabs = st.tabs(["Overview", "Bank Accounts", "Mutual Funds", "Stock Holdings", "Udhari Tracker", "Provision Fund"])
 
     with tabs[0]:
         financial_overview()
@@ -336,10 +396,11 @@ def main():
         manage_stock_holdings()
     with tabs[4]:
         manage_udhari()
+    with tabs[5]:
+        manage_provision_fund()
 
     st.markdown("---")
     st.caption("Developed with ❤️ using Streamlit")
 
 if __name__ == "__main__":
     main()
-
