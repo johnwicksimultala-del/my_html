@@ -65,6 +65,8 @@ def financial_overview():
     total_udhari = st.session_state.udhari_df["Amount Owed"].sum() if not st.session_state.udhari_df.empty else 0
     total_pf = st.session_state.pf_df["Balance"].sum() if not st.session_state.pf_df.empty else 0
 
+    udahri_cash=total_bank+total_udhari
+    udhari_cash_stock=udahri_cash+total_mutual+total_stocks
     total_wealth = total_bank + total_mutual + total_stocks + total_udhari + total_pf
 
     col1, col2, col3, col4, col5 = st.columns(5)
@@ -76,6 +78,8 @@ def financial_overview():
 
     st.markdown("---")
     st.subheader("Wealth Summary")
+    st.markdown(f"**Cash + Udhari :**  ₹{udahri_cash:,.2f}")
+    st.markdown(f"**Cash + Udhari+ Stock:**  ₹{udhari_cash_stock:,.2f}")
     st.markdown(f"**Total Current Wealth:**  ₹{total_wealth:,.2f}")
 
     # Pie chart of asset distribution (excluding Udhari)
