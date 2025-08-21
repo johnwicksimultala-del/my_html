@@ -16,9 +16,9 @@ SHEET_PF = "ProvisionFund"  # New sheet name for Provision Fund
 if "bank_df" not in st.session_state:
     st.session_state.bank_df = pd.DataFrame(columns=["Account Name", "Balance"])
 if "mutual_df" not in st.session_state:
-    st.session_state.mutual_df = pd.DataFrame(columns=["Fund Name", "Units", "NAV", "Total Value"])
+    st.session_state.mutual_df = pd.DataFrame(columns=["Fund Name", "Total Value"])
 if "stocks_df" not in st.session_state:
-    st.session_state.stocks_df = pd.DataFrame(columns=["Stock Symbol", "Shares", "Price", "Total Value"])
+    st.session_state.stocks_df = pd.DataFrame(columns=["Stock", "Total Value"])
 if "udhari_df" not in st.session_state:
     st.session_state.udhari_df = pd.DataFrame(columns=["Person", "Amount Owed"])
 if "pf_df" not in st.session_state:
@@ -122,6 +122,7 @@ def manage_bank_accounts():
                     st.session_state.bank_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     save_data()
                     st.success(f"Bank account '{account_name}' added.")
+                    st.rerun()
 
     if not df.empty:
         st.markdown("### Edit / Delete Bank Accounts")
@@ -146,10 +147,12 @@ def manage_bank_accounts():
                         st.session_state.bank_df.at[selected_index, "Balance"] = new_balance
                         save_data()
                         st.success("Bank account updated.")
+                        st.rerun()
                 if delete_btn:
                     st.session_state.bank_df = df.drop(selected_index).reset_index(drop=True)
                     save_data()
                     st.success("Bank account deleted.")
+                    st.rerun()
 
 def manage_mutual_funds():
     st.subheader("Mutual Funds")
@@ -157,31 +160,29 @@ def manage_mutual_funds():
 
     # Calculate Total Value column if missing or outdated
     if not df.empty:
-        df["Total Value"] = df["Units"] * df["NAV"]
         st.session_state.mutual_df = df
 
     if df.empty:
         st.info("No mutual funds added yet.")
     else:
-        st.dataframe(df.style.format({"Units": "{:.2f}", "NAV": "₹{:,.2f}", "Total Value": "₹{:,.2f}"}))
+        st.dataframe(df.style.format({ "Total Value": "₹{:,.2f}"}))
 
     with st.expander("Add New Mutual Fund"):
         with st.form("add_mutual_form", clear_on_submit=True):
             fund_name = st.text_input("Fund Name", max_chars=50)
-            units = st.number_input("Units", min_value=0.0, format="%.4f")
-            nav = st.number_input("NAV (Net Asset Value)", min_value=0.0, format="%.4f")
+            total_value=st.number_input('Total Value')
             submitted = st.form_submit_button("Add Mutual Fund")
             if submitted:
                 if not fund_name.strip():
                     st.error("Fund Name cannot be empty.")
-                elif not validate_positive_number(units, "Units") or not validate_positive_number(nav, "NAV"):
+                elif not validate_positive_number(total_value, "Total Value"):
                     pass
                 else:
-                    total_value = units * nav
-                    new_row = {"Fund Name": fund_name.strip(), "Units": units, "NAV": nav, "Total Value": total_value}
+                    new_row = {"Fund Name": fund_name.strip(),"Total Value": total_value}
                     st.session_state.mutual_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     save_data()
                     st.success(f"Mutual fund '{fund_name}' added.")
+                st.rerun()
 
     if not df.empty:
         st.markdown("### Edit / Delete Mutual Funds")
@@ -190,8 +191,7 @@ def manage_mutual_funds():
             selected_fund = df.loc[selected_index]
             with st.form("edit_mutual_form"):
                 new_name = st.text_input("Fund Name", value=selected_fund["Fund Name"], max_chars=50)
-                new_units = st.number_input("Units", min_value=0.0, value=float(selected_fund["Units"]), format="%.4f")
-                new_nav = st.number_input("NAV", min_value=0.0, value=float(selected_fund["NAV"]), format="%.4f")
+                total_value = st.number_input("Total Value", min_value=0.0, value=float(selected_fund["Total Value"]), format="%.4f")
                 col1, col2 = st.columns(2)
                 with col1:
                     save_btn = st.form_submit_button("Save Changes")
@@ -200,82 +200,77 @@ def manage_mutual_funds():
                 if save_btn:
                     if not new_name.strip():
                         st.error("Fund Name cannot be empty.")
-                    elif not validate_positive_number(new_units, "Units") or not validate_positive_number(new_nav, "NAV"):
+                    elif not validate_positive_number(total_value, "Units") :
                         pass
                     else:
                         st.session_state.mutual_df.at[selected_index, "Fund Name"] = new_name.strip()
-                        st.session_state.mutual_df.at[selected_index, "Units"] = new_units
-                        st.session_state.mutual_df.at[selected_index, "NAV"] = new_nav
-                        st.session_state.mutual_df.at[selected_index, "Total Value"] = new_units * new_nav
+                        st.session_state.mutual_df.at[selected_index, "Total Value"] =total_value
                         save_data()
                         st.success("Mutual fund updated.")
+                        st.rerun()
                 if delete_btn:
                     st.session_state.mutual_df = df.drop(selected_index).reset_index(drop=True)
                     save_data()
                     st.success("Mutual fund deleted.")
-
+                    st.rerun()
+        
 def manage_stock_holdings():
     st.subheader("Stock Market Holdings")
     df = st.session_state.stocks_df
 
     # Calculate Total Value column if missing or outdated
     if not df.empty:
-        df["Total Value"] = df["Shares"] * df["Price"]
         st.session_state.stocks_df = df
 
     if df.empty:
         st.info("No stock holdings added yet.")
     else:
-        st.dataframe(df.style.format({"Shares": "{:.2f}", "Price": "₹{:,.2f}", "Total Value": "₹{:,.2f}"}))
+        st.dataframe(df.style.format({ "Total Value": "₹{:,.2f}"}))
 
     with st.expander("Add New Stock Holding"):
         with st.form("add_stock_form", clear_on_submit=True):
-            symbol = st.text_input("Stock Symbol", max_chars=10)
-            shares = st.number_input("Shares", min_value=0.0, format="%.4f")
-            price = st.number_input("Price per Share", min_value=0.0, format="%.4f")
+           
+            Stock = st.text_input("Stock")
+            Total_value = st.number_input("Total Value", min_value=0.0, format="%.4f")
             submitted = st.form_submit_button("Add Stock")
             if submitted:
-                if not symbol.strip():
-                    st.error("Stock Symbol cannot be empty.")
-                elif not validate_positive_number(shares, "Shares") or not validate_positive_number(price, "Price"):
-                    pass
+                if not Stock.strip():
+                    st.error("Stock Stock cannot be empty.")
                 else:
-                    total_value = shares * price
-                    new_row = {"Stock Symbol": symbol.strip().upper(), "Shares": shares, "Price": price, "Total Value": total_value}
+                    new_row = { "Stock": Stock,"Total Value": Total_value}
                     st.session_state.stocks_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     save_data()
-                    st.success(f"Stock '{symbol.upper()}' added.")
+                    st.success(f"Stock '{Stock.upper()}' added.")
+                    st.rerun()
 
     if not df.empty:
         st.markdown("### Edit / Delete Stock Holdings")
-        selected_index = st.selectbox("Select stock to edit/delete", df.index, format_func=lambda i: df.at[i, "Stock Symbol"])
+        selected_index = st.selectbox("Select stock to edit/delete", df.index, format_func=lambda i: df.at[i, "Stock"])
         if selected_index is not None:
             selected_stock = df.loc[selected_index]
             with st.form("edit_stock_form"):
-                new_symbol = st.text_input("Stock Symbol", value=selected_stock["Stock Symbol"], max_chars=10)
-                new_shares = st.number_input("Shares", min_value=0.0, value=float(selected_stock["Shares"]), format="%.4f")
-                new_price = st.number_input("Price per Share", min_value=0.0, value=float(selected_stock["Price"]), format="%.4f")
+                stock = st.text_input("Stock", value=selected_stock["Stock"], max_chars=10)
+                Total_value = st.number_input("Total Value", min_value=0.0, format="%.4f")
                 col1, col2 = st.columns(2)
                 with col1:
                     save_btn = st.form_submit_button("Save Changes")
                 with col2:
                     delete_btn = st.form_submit_button("Delete Stock")
                 if save_btn:
-                    if not new_symbol.strip():
+                    if not stock.strip():
                         st.error("Stock Symbol cannot be empty.")
-                    elif not validate_positive_number(new_shares, "Shares") or not validate_positive_number(new_price, "Price"):
-                        pass
+
                     else:
-                        st.session_state.stocks_df.at[selected_index, "Stock Symbol"] = new_symbol.strip().upper()
-                        st.session_state.stocks_df.at[selected_index, "Shares"] = new_shares
-                        st.session_state.stocks_df.at[selected_index, "Price"] = new_price
-                        st.session_state.stocks_df.at[selected_index, "Total Value"] = new_shares * new_price
+                        st.session_state.stocks_df.at[selected_index, "Stock"] = stock.strip().upper()
+                        st.session_state.stocks_df.at[selected_index, "Total Value"] = Total_value
                         save_data()
                         st.success("Stock holding updated.")
+                        st.rerun()
                 if delete_btn:
                     st.session_state.stocks_df = df.drop(selected_index).reset_index(drop=True)
                     save_data()
                     st.success("Stock holding deleted.")
+                    st.rerun()
 
 def manage_udhari():
     st.subheader("Udhari Tracker")
@@ -301,6 +296,7 @@ def manage_udhari():
                     st.session_state.udhari_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     save_data()
                     st.success(f"Udhari record for '{person}' added.")
+                    st.rerun()
 
     if not df.empty:
         st.markdown("### Edit / Delete Udhari Records")
@@ -329,6 +325,7 @@ def manage_udhari():
                     st.session_state.udhari_df = df.drop(selected_index).reset_index(drop=True)
                     save_data()
                     st.success("Udhari record deleted.")
+                    st.rerun()
 
 def manage_provision_fund():
     st.subheader("Provision Fund")
@@ -354,6 +351,7 @@ def manage_provision_fund():
                     st.session_state.pf_df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                     save_data()
                     st.success(f"Provision Fund '{pf_account_name}' added.")
+                    st.rerun()
 
     if not df.empty:
         st.markdown("### Edit / Delete Provision Fund Records")
@@ -382,6 +380,7 @@ def manage_provision_fund():
                     st.session_state.pf_df = df.drop(selected_index).reset_index(drop=True)
                     save_data()
                     st.success("Provision Fund record deleted.")
+                    st.rerun()
 
 def main():
     st.set_page_config(page_title="Personal Finance Dashboard", layout="wide", initial_sidebar_state="expanded")
