@@ -386,6 +386,36 @@ def main():
     st.set_page_config(page_title="Personal Finance Dashboard", layout="wide", initial_sidebar_state="expanded")
     st.title("📊 Personal Finance Dashboard")
 
+    # --- Download Excel Button ---
+    try:
+        with open(EXCEL_FILE, "rb") as f:
+            st.download_button(
+                label="Download All Data (Excel)",
+                data=f,
+                file_name=EXCEL_FILE,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    except FileNotFoundError:
+        st.info("No data file found to download.")
+
+    # --- Upload Excel Button ---
+    uploaded_excel = st.file_uploader("Upload Excel to replace ALL data", type=["xlsx"])
+    if uploaded_excel is not None:
+        try:
+            xls = pd.ExcelFile(uploaded_excel)
+            st.session_state.bank_df = pd.read_excel(xls, SHEET_BANK)
+            st.session_state.mutual_df = pd.read_excel(xls, SHEET_MUTUAL)
+            st.session_state.stocks_df = pd.read_excel(xls, SHEET_STOCKS)
+            st.session_state.udhari_df = pd.read_excel(xls, SHEET_UDHARI)
+            st.session_state.pf_df = pd.read_excel(xls, SHEET_PF)
+            # Save uploaded file as the main data file
+            with open(EXCEL_FILE, "wb") as f:
+                f.write(uploaded_excel.getbuffer())
+            st.success("All data replaced successfully.")
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error reading uploaded Excel file: {e}")
+
     load_data()
 
     tabs = st.tabs(["Overview", "Bank Accounts", "Mutual Funds", "Stock Holdings", "Udhari Tracker", "Provision Fund"])
@@ -405,6 +435,8 @@ def main():
 
     st.markdown("---")
     st.caption("Developed with ❤️ using Streamlit")
+    if st.button('Refresh'):
+        st.rerun()
 
 if __name__ == "__main__":
     main()
